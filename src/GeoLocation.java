@@ -2,37 +2,51 @@ import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 
-import javax.net.ssl.HttpsURLConnection;
-import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
+import java.net.*;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Scanner;
 
 public class GeoLocation {
+    private static final HttpClient httpClient = HttpClient.newHttpClient();
     public static void main(String[] args) {
         System.out.println("----------------------------------------------");
         System.out.println("Welcome to the Weather Application");
         System.out.println("----------------------------------------------");
-        Scanner input = new Scanner(System.in);
-        System.out.print("Enter the city name: ");
-        String name = input.nextLine();
-        try {
-            JSONObject apiData = getApiData(name);
 
-            assert apiData != null;
-            JSONArray dataResults = (JSONArray) apiData.get("results");
-            JSONObject results = (JSONObject) dataResults.get(0);
 
-            String name2 = (String) results.get("admin2");
-            double longitude = (double) results.get("longitude");
-            double latitude = (double) results.get("latitude");
+        try (Scanner input = new Scanner(System.in)) {
+            System.out.print("Enter the city cityName: ");
+            String cityName = input.nextLine();
 
+            JSONObject locationData = getLocationData(cityName);
+
+            if (locationData == null || !locationData.containsKey("results")) {
+                System.out.println("The results for the city " + cityName + "is not available.");
+                return;
+            }
+
+            JSONArray dataResults = (JSONArray) locationData.get("results");
+            if (dataResults.isEmpty()) {
+                System.out.println("No location found for: " + cityName);
+                return;
+            }
+            JSONObject location = (JSONObject) dataResults.get(0);
+
+            String admin2 = (String) location.get("admin2");
+            double longitude = (double) location.get("longitude");
+            double latitude = (double) location.get("latitude");
 
             JSONObject weatherData = getWeatherData(longitude, latitude);
 
-            assert weatherData != null;
+            if (weatherData == null || !weatherData.containsKey("current")) {
+                System.out.println("Could not retrieve weather data.");
+                return;
+            }
+
             JSONObject weather_results = (JSONObject) weatherData.get("current");
             double temp = (double) weather_results.get("temperature_2m");
             long humidity = (long) weather_results.get("relative_humidity_2m");
@@ -44,10 +58,10 @@ public class GeoLocation {
             String wind_speed_unit = (String) weather_units.get("wind_speed_10m");
 
             System.out.println("----------------------------------------------");
-            if (name2 != null) {
-                System.out.println("Here are the weather results of " + name + ", " + name2 + ": ");
+            if (admin2 != null) {
+                System.out.println("Here are the weather results of " + cityName + ", " + admin2 + ": ");
             } else {
-                System.out.println("Here are the weather results of " + name + ": ");
+                System.out.println("Here are the weather results of " + cityName + ": ");
             }
 
             System.out.println("The temperature: " + temp + temp_units);
@@ -56,88 +70,67 @@ public class GeoLocation {
 
             System.out.println("----------------------------------------------");
 
-        } catch (NullPointerException e) {
-            System.out.println("The results for the city "+ name +" is not available.");
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
         }
     }
 
-    public static JSONObject getApiData(String city_name) {
-        city_name = city_name.replaceAll(" ", "+");
-
-        String url = "https://geocoding-api.open-meteo.com/v1/search?name="+city_name+"&count=1&language=en&format=json";
-
+    public static JSONObject getLocationData(String cityName) {
         try{
-            HttpURLConnection apiConnection = fetchApiResponse(url);
 
-            if(apiConnection.getResponseCode() != 200){
-                System.out.println("Error: Could not connect to API");
+            String encodedCity = URLEncoder.encode(cityName, StandardCharsets.UTF_8);
+
+            String url = "https://geocoding-api.open-meteo.com/v1/search?name="+encodedCity+"&count=1&language=en&format=json";
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(10))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if(response.statusCode() != 200){
+                System.out.println("Error: API returned status " + response.statusCode());
                 return null;
             }
 
-            String jsonResponse = readApiResponse(apiConnection);
-
             JSONParser parser = new JSONParser();
-            JSONObject resultsJsonObj = (JSONObject) parser.parse(jsonResponse);
+            return (JSONObject) parser.parse(response.body());
 
-            return (JSONObject) resultsJsonObj;
+
 
         }catch(Exception e){
-            e.printStackTrace();
+            System.out.println(e.getMessage());
+            return null;
         }
-        return null;
     }
 
     public static JSONObject getWeatherData(double longitude, double latitude) {
-        String url = "https://api.open-meteo.com/v1/forecast?latitude="+latitude+"&longitude="+longitude+"&current=temperature_2m,relative_humidity_2m,wind_speed_10m&forecast_days=1";
-
         try{
-            HttpURLConnection apiConnection = fetchApiResponse(url);
+            String url = "https://api.open-meteo.com/v1/forecast?latitude="+latitude+"&longitude="+longitude+"&current=temperature_2m,relative_humidity_2m,wind_speed_10m&forecast_days=1";
 
-            if(apiConnection.getResponseCode() != 200){
-                System.out.println("Error: Could not connect to API");
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(10))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if(response.statusCode() != 200){
+                System.out.println("Error: API returned status " + response.statusCode());
                 return null;
             }
 
-            String jsonResponse = readApiResponse(apiConnection);
-
             JSONParser parser = new JSONParser();
-            JSONObject resultsJsonObj = (JSONObject) parser.parse(jsonResponse);
+            return (JSONObject) parser.parse(response.body());
 
-            return (JSONObject) resultsJsonObj;
+
 
         }catch(Exception e){
-            e.printStackTrace();
+            System.out.println(e.getMessage());
+            return null;
         }
-        return null;
-    }
-
-    private static String readApiResponse(HttpURLConnection apiConnection) {
-        try {
-            StringBuilder resultJson = new StringBuilder();
-            Scanner scanner = new Scanner(apiConnection.getInputStream());
-
-            while (scanner.hasNext()) {
-                resultJson.append(scanner.nextLine());
-            }
-            scanner.close();
-            return resultJson.toString();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
-    public static HttpURLConnection fetchApiResponse(String url) {
-        try {
-            URL url1 = new URI(url).toURL();
-            HttpURLConnection connection = (HttpsURLConnection) url1.openConnection();
-            connection.setRequestMethod("GET");
-            return connection;
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (URISyntaxException e) {
-            e.printStackTrace();
-        }
-        return null;
     }
 }
