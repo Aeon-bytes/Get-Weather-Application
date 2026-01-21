@@ -1,3 +1,9 @@
+package com.GetWeather;
+
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -10,9 +16,16 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Scanner;
 
-public class GeoLocation {
+@SpringBootApplication
+public class GetWeatherApplication implements CommandLineRunner {
     private static final HttpClient httpClient = HttpClient.newHttpClient();
+
     public static void main(String[] args) {
+        SpringApplication.run(GetWeatherApplication.class, args);
+    }
+
+    @Override
+    public void run(String... args) throws Exception {
         System.out.println("----------------------------------------------");
         System.out.println("Welcome to the Weather Application");
         System.out.println("----------------------------------------------");
@@ -75,7 +88,7 @@ public class GeoLocation {
         }
     }
 
-    public static JSONObject getLocationData(String cityName) {
+    private static JSONObject getLocationData(String cityName) {
         try{
 
             String encodedCity = URLEncoder.encode(cityName, StandardCharsets.UTF_8);
@@ -106,7 +119,7 @@ public class GeoLocation {
         }
     }
 
-    public static JSONObject getWeatherData(double longitude, double latitude) {
+    private static JSONObject getWeatherData(double longitude, double latitude) {
         try{
             String url = "https://api.open-meteo.com/v1/forecast?latitude="+latitude+"&longitude="+longitude+"&current=temperature_2m,relative_humidity_2m,wind_speed_10m&forecast_days=1";
 

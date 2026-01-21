@@ -1,0 +1,5 @@
+Main-Class: com.GetWeather.GetWeatherApplication
+Manifest-Version: 1.0
+Created-By: 1.8.0_281 (Oracle Corporation)
+Implementation-Title: GetWeatherApplication
+Implementation-Version: 1.0
